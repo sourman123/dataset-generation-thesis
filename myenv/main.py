@@ -14,8 +14,8 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 languages = ["JavaScript"]
 models = [
     "openai/gpt-oss-120b",
-    "llama-3.3-70b-versatile",  # Keep stable models
-    # "qwen/qwen3-32b",  # commented out (unstable JSON)
+    "llama-3.3-70b-versatile",
+    "qwen/qwen3-32b"
 ]
 
 hallucination_types = [
@@ -54,19 +54,18 @@ Generate a realistic {language} code snippet (20–80 lines) that represents **o
 ---
 Requirements:
 - Alternate between frontend (React) and backend (Node.js + Express) logic across generations.
-- The code must look like something from a real project (not toy examples).
-- If it’s a hallucination, make it look plausible but factually wrong.
-- If it’s correct, make it actually valid and secure.
-- Output must be valid JSON. Properly escape all quotes and newlines inside code.
-- Do NOT explain or comment outside JSON.
+- The code must look realistic (imports, functions, etc.), not toy-like.
+- If it’s a hallucination, make it look plausible but wrong.
+- If it’s correct, make it valid and secure.
+- Respond strictly in **valid JSON**, no extra text or markdown.
 
-Respond in **strict JSON**:
+Respond with this structure:
 {{
   "language": "{language}",
   "hallucination_type": "{hallucination_type}",
-  "code_snippet": "<full {language} code here, escaped properly>",
-  "description": "<brief summary of what this code is supposed to do>",
-  "hallucination_details": "<if hallucinated: describe the incorrect or invented part; if correct: 'none'>"
+  "code_snippet": "<escaped {language} code>",
+  "description": "<brief summary>",
+  "hallucination_details": "<if hallucinated: explain; if correct: 'none'>"
 }}
 """
 
@@ -86,22 +85,23 @@ def try_parse_json(raw_text):
 all_snippets = []
 output_file = "hallucination_code_dataset.csv"
 
-for i in range(100):
+for i in range(300):  # adjust number of samples
     chosen_lang = random.choice(languages)
     hallucination_type = random.choice(hallucination_types)
     model_name = models[i % len(models)]
 
-    prompt = get_prompt_with_hallucination_type(chosen_lang, hallucination_type)
     print(f"\n🔹 Generating snippet {i+1} ({hallucination_type}) using {model_name}...")
 
+    prompt = get_prompt_with_hallucination_type(chosen_lang, hallucination_type)
     attempts = 0
+
     while attempts < 3:
         try:
             request_params = {
                 "model": model_name,
                 "messages": [
-                    {"role": "system", "content": "You are a hallucination-focused code generator."},
-                    {"role": "user", "content": prompt + "\nEnsure output is valid JSON with properly escaped code strings."}
+                    {"role": "system", "content": "You are a hallucination-focused code generation assistant."},
+                    {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.9,
                 "max_tokens": 1024,
@@ -116,9 +116,9 @@ for i in range(100):
                 parsed["model"] = model_name
                 normalized = {col: parsed.get(col, "") for col in COLUMNS}
                 all_snippets.append(normalized)
-                print(f"✅ Success: {hallucination_type}")
+                print(f"Success: {hallucination_type}")
             else:
-                print("⚠️ Invalid JSON. Raw output stored.")
+                print("⚠️ Invalid JSON. Raw output saved.")
                 all_snippets.append({
                     "language": chosen_lang,
                     "hallucination_type": hallucination_type,
@@ -127,16 +127,17 @@ for i in range(100):
                     "model": model_name
                 })
 
-            time.sleep(10)
-            break  # Success, move on
+            time.sleep(8)
+            break  # Success
         except Exception as e:
-            print(f"❌ Error with {model_name}: {e}")
+            print(f"Error with {model_name}: {e}")
             attempts += 1
             if "400" in str(e):
-                print(f"⏭️ Skipping model {model_name} due to repeated 400 errors.")
+                print(f"Skipping model {model_name} after repeated 400 errors.")
                 break
-            print("Retrying in 30 seconds...")
-            time.sleep(30)
+            print("Retrying in 20 seconds...")
+            time.sleep(20)
+
 
 # Save dataset
 df_new = pd.DataFrame(all_snippets)
@@ -147,7 +148,7 @@ if os.path.exists(output_file):
     df_combined.drop_duplicates(subset=["code_snippet"], inplace=True)
     df_combined.to_csv(output_file, index=False)
 else:
-    print(f"\n🆕 Creating new file '{output_file}'...")
+    print(f"\n Creating new file '{output_file}'...")
     df_new.to_csv(output_file, index=False)
 
-print(f"\n✅ Generation complete. Total snippets: {len(all_snippets)}")
+print(f"\n Generation complete. Total snippets: {len(all_snippets)}")
