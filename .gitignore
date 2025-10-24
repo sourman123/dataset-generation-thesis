@@ -43,5 +43,6 @@ Thumbs.db
 .DS_Store
 
 # Project specific
+*.csv
 *.dat
 *.out
