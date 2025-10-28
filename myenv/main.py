@@ -147,7 +147,7 @@ def try_parse_json(raw_text):
 all_snippets = []
 output_file = "hallucination_code_dataset.csv"
 
-for i in range(70):  # adjust number of samples
+for i in range(200):  # adjust number of samples
     chosen_lang = random.choice(languages)
     hallucination_type = random.choices(
     hallucination_types,
